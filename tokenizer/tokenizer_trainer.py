@@ -32,7 +32,7 @@ then "about" should be recorded before "spite".
 
 import re
 from collections import Counter
-
+from saving import save_merges, save_vocab
 
 def split_with_delimiter(string, delimiter):
     ''' This splits along the delimiter, but the result includes the delimiter in the split. '''
@@ -57,6 +57,19 @@ def split_along_vocab(text, subs):
             i += 1
     return result
 
+def choose_pair_to_merge(pair_counts):
+    ''' This finds the highest counted pairs, and if there are many it breaks the tie alphabetically. '''
+    best_count = max(pair_counts.values())
+    candidates = [p for p,c in pair_counts.items() if c == best_count]
+    best_pair = min(candidates, key=lambda p: p[0] + p[1]) 
+    return best_pair
+
+def merge(pair, vocabulary, merge_list):
+    ''' This merges two tokens together. '''
+    merged = pair[0] + pair[1]
+    vocabulary.append(merged)
+    merge_list.append(pair)
+
 
 def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     '''
@@ -72,15 +85,16 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     # Open the file and load the corpus
     with open(txt_file, 'r') as file:
         corpus = file.read()
-        
+        merges = []
+
         # Build a word frequency dictionary
-        tokens = split_with_delimiter(corpus, ' ')
-        word_frequencies = Counter(tokens)
+        words = split_with_delimiter(corpus, ' ')
+        word_frequencies = Counter(words)
         
         # Build up until the vocab size
-        pair_counts = {}
         while len(base_vocabulary) != vocab_size:
             # Now we iterate over word frequencies and count the pairs
+            pair_counts = {}
             for word, freq in word_frequencies.items():
                 tokens = split_along_vocab(word, base_vocabulary)
                 
@@ -88,23 +102,15 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
                     pair = (tokens[i], tokens[i+1])
                     pair_counts[pair] = pair_counts.get(pair, 0) + freq
                 
-                
-                print(word, freq)
-                print(tokens)
-                print(pair_counts)
-                print('=======')
-                break
-            # print(word_frequencies.most_common()[0])
-            # Kinda confused here, look at lecture again later.
-            break
-        print('='*10)
-        print(base_vocabulary)
-
-
-    # TODO
-
-
-
+            # Now that we counted all pairs in the corpus, we pick the most frequent
+            most_frequent_pair = choose_pair_to_merge(pair_counts)
+            
+            # Merge the most frequent pair
+            merge(most_frequent_pair, base_vocabulary, merges)
+        
+        # Save the vocab and merges once its all done
+        save_vocab(base_vocabulary)
+        save_merges(merges)
 
 if __name__ == "__main__":
 
@@ -116,10 +122,4 @@ if __name__ == "__main__":
     base += "\\"
     base += '"'
 
-    train_tokenizer("./data.txt", len(base)+1000, [c for c in base])
-    # print(split_with_delimiter('Hello World, how are you doing!', ' '))
-
-    string = "Rain on a train"
-    subs = ["r", "a", "i", "n", "o", "t", "ain"]
-
-    # print(split_along_vocab(string, subs))
+    train_tokenizer("./data2.txt", len(base)+50, [c for c in base])
