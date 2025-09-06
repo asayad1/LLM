@@ -81,7 +81,20 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
         pair_counts = {}
         while len(base_vocabulary) != vocab_size:
             # Now we iterate over word frequencies and count the pairs
-            print(word_frequencies.most_common()[0])
+            for word, freq in word_frequencies.items():
+                tokens = split_along_vocab(word, base_vocabulary)
+                
+                for i in range(len(tokens) - 1):
+                    pair = (tokens[i], tokens[i+1])
+                    pair_counts[pair] = pair_counts.get(pair, 0) + freq
+                
+                
+                print(word, freq)
+                print(tokens)
+                print(pair_counts)
+                print('=======')
+                break
+            # print(word_frequencies.most_common()[0])
             # Kinda confused here, look at lecture again later.
             break
         print('='*10)
