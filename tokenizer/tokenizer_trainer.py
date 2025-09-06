@@ -1,5 +1,3 @@
-import json
-
 '''
 Your assignment is to implement BPE in the following method. You can add
 classes or other routines if you find them helpful. 
@@ -97,17 +95,22 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
             pair_counts = {}
             for word, freq in word_frequencies.items():
                 tokens = split_along_vocab(word, base_vocabulary)
-                
-                for i in range(len(tokens) - 1):
-                    pair = (tokens[i], tokens[i+1])
-                    pair_counts[pair] = pair_counts.get(pair, 0) + freq
-                
+                per_word_pairs = Counter(zip(tokens, tokens[1:]))
+            
+                for pair, count_in_word in per_word_pairs.items():
+                    pair_counts[pair] = pair_counts.get(pair, 0) + count_in_word * freq
+
+            # See if any more pairs exist (this is necessary otherwise theres a max on empty error)
+            if not pair_counts:
+                break
+
             # Now that we counted all pairs in the corpus, we pick the most frequent
             most_frequent_pair = choose_pair_to_merge(pair_counts)
             
             # Merge the most frequent pair
             merge(most_frequent_pair, base_vocabulary, merges)
-        
+            print(f'{(len(base_vocabulary) / vocab_size) :.3%}% ({len(base_vocabulary)} / {vocab_size} learned vocab)')
+
         # Save the vocab and merges once its all done
         save_vocab(base_vocabulary)
         save_merges(merges)
@@ -122,4 +125,4 @@ if __name__ == "__main__":
     base += "\\"
     base += '"'
 
-    train_tokenizer("./data2.txt", len(base)+50, [c for c in base])
+    train_tokenizer("./data.txt", len(base)+500, [c for c in base])
