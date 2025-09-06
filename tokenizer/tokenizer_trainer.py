@@ -28,8 +28,35 @@ Points will be taken off if a different tie-break is used as it will not match t
 
 For example, if the pairs ('ab','out') and ('sp','ite') are tied for most occuring,
 then "about" should be recorded before "spite".
-
 '''
+
+import re
+from collections import Counter
+
+
+def split_with_delimiter(string, delimiter):
+    ''' This splits along the delimiter, but the result includes the delimiter in the split. '''
+    return re.split(f"(?={re.escape(delimiter)})", string)
+
+
+def split_along_vocab(text, subs):
+    ''' This splits words into tokens defined in the vocab list. '''
+    # Sort so that longer matches are tried first
+    subs = sorted(subs, key=len, reverse=True)
+    i = 0
+    result = []
+    while i < len(text):
+        for sub in subs:
+            if text.startswith(sub, i):
+                result.append(sub)
+                i += len(sub)
+                break
+        else:
+            # No match so take single character
+            result.append(text[i])
+            i += 1
+    return result
+
 
 def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     '''
@@ -42,6 +69,25 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     ./merges.json : a list of tuples of merges, in order
     '''
 
+    # Open the file and load the corpus
+    with open(txt_file, 'r') as file:
+        corpus = file.read()
+        
+        # Build a word frequency dictionary
+        tokens = split_with_delimiter(corpus, ' ')
+        word_frequencies = Counter(tokens)
+        
+        # Build up until the vocab size
+        pair_counts = {}
+        while len(base_vocabulary) != vocab_size:
+            # Now we iterate over word frequencies and count the pairs
+            print(word_frequencies.most_common()[0])
+            # Kinda confused here, look at lecture again later.
+            break
+        print('='*10)
+        print(base_vocabulary)
+
+
     # TODO
 
 
@@ -50,7 +96,6 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
 if __name__ == "__main__":
 
     # example of using this method.
-
     base = "abcdefghijklmnopqrstuvwxyz"
     base += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     base += "0123456789"
@@ -59,3 +104,9 @@ if __name__ == "__main__":
     base += '"'
 
     train_tokenizer("./data.txt", len(base)+1000, [c for c in base])
+    # print(split_with_delimiter('Hello World, how are you doing!', ' '))
+
+    string = "Rain on a train"
+    subs = ["r", "a", "i", "n", "o", "t", "ain"]
+
+    # print(split_along_vocab(string, subs))
