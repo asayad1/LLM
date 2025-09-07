@@ -94,6 +94,7 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     ./vocab.txt : a list of the final vocabulary in order, one entry per line, ties broken alphabetically
     ./merges.json : a list of tuples of merges, in order
     '''
+    log_file = open("train.log", "a", buffering=1)
 
     # Open the file and load the corpus
     with open(txt_file, 'r') as file:
@@ -146,11 +147,17 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
                     tokenized_cache[word] = old_tokens
 
             # Print training progress
-            print(f'{(len(base_vocabulary) / vocab_size) :.3%}% ({len(base_vocabulary)} / {vocab_size} learned vocab) - {datetime.now().strftime("%H:%M:%S")}')
-
+            print(f'{(len(base_vocabulary) / vocab_size) :.3%} '
+                f'({len(base_vocabulary)} / {vocab_size} learned vocab) - '
+                f'{datetime.now().strftime("%H:%M:%S")}',
+                file=log_file, flush=False)
+        
         # Save the vocab and merges once its all done
         save_vocab(base_vocabulary)
         save_merges(merges)
+    
+    log_file.close()
+
 
 if __name__ == "__main__":
     # Example of using this method.
@@ -161,4 +168,4 @@ if __name__ == "__main__":
     base += "\\"
     base += '"'
 
-    train_tokenizer("./data.txt", len(base)+10000, [c for c in base])
+    train_tokenizer("./data.txt", len(base)+50000, [c for c in base])
