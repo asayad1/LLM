@@ -30,6 +30,7 @@ then "about" should be recorded before "spite".
 
 import re
 from collections import Counter
+from datetime import datetime
 from saving import save_merges, save_vocab
 
 def split_with_delimiter(string, delimiter):
@@ -39,8 +40,8 @@ def split_with_delimiter(string, delimiter):
 
 def split_along_vocab(text, subs):
     ''' This splits words into tokens defined in the vocab list. '''
-    # Sort so that longer matches are tried first
-    subs = sorted(subs, key=len, reverse=True)
+    # This is now expected to bring in a sorted (longest-first) vocab
+    # I did this because previously I was sorting once per every unique word when instead it should be once per iteration
     i = 0
     result = []
     while i < len(text):
@@ -58,7 +59,7 @@ def split_along_vocab(text, subs):
 def choose_pair_to_merge(pair_counts):
     ''' This finds the highest counted pairs, and if there are many it breaks the tie alphabetically. '''
     best_count = max(pair_counts.values())
-    candidates = [p for p,c in pair_counts.items() if c == best_count]
+    candidates = [p for p, c in pair_counts.items() if c == best_count]
     best_pair = min(candidates, key=lambda p: p[0] + p[1]) 
     return best_pair
 
@@ -68,6 +69,20 @@ def merge(pair, vocabulary, merge_list):
     vocabulary.append(merged)
     merge_list.append(pair)
 
+def apply_merge_to_tokens(tokens, pair, merged_pair):
+    ''' This replaces every adjacent (a,b) with merged_pair.'''
+    a, b = pair
+    out = []
+    i = 0
+    n = len(tokens)
+    while i < n:
+        if i + 1 < n and tokens[i] == a and tokens[i + 1] == b:
+            out.append(merged_pair)
+            i += 2
+        else:
+            out.append(tokens[i])
+            i += 1
+    return out
 
 def train_tokenizer(txt_file, vocab_size, base_vocabulary):
     '''
@@ -88,15 +103,20 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
         # Build a word frequency dictionary
         words = split_with_delimiter(corpus, ' ')
         word_frequencies = Counter(words)
+
+        # Sort vocab by length
+        vocab_sorted_by_len = tuple(sorted(base_vocabulary, key=len, reverse=True))
+        tokenized_cache = { word: split_along_vocab(word, vocab_sorted_by_len) for word in word_frequencies }
         
         # Build up until the vocab size
         while len(base_vocabulary) != vocab_size:
             # Now we iterate over word frequencies and count the pairs
             pair_counts = {}
+
             for word, freq in word_frequencies.items():
-                tokens = split_along_vocab(word, base_vocabulary)
+                tokens = tokenized_cache[word]
                 per_word_pairs = Counter(zip(tokens, tokens[1:]))
-            
+                
                 for pair, count_in_word in per_word_pairs.items():
                     pair_counts[pair] = pair_counts.get(pair, 0) + count_in_word * freq
 
@@ -106,18 +126,34 @@ def train_tokenizer(txt_file, vocab_size, base_vocabulary):
 
             # Now that we counted all pairs in the corpus, we pick the most frequent
             most_frequent_pair = choose_pair_to_merge(pair_counts)
-            
+            merged_tokens = most_frequent_pair[0] + most_frequent_pair[1] 
+
             # Merge the most frequent pair
             merge(most_frequent_pair, base_vocabulary, merges)
-            print(f'{(len(base_vocabulary) / vocab_size) :.3%}% ({len(base_vocabulary)} / {vocab_size} learned vocab)')
+
+            # Rebuild longest-first vocab which includes the new symbol
+            vocab_sorted_by_len = tuple(sorted(base_vocabulary, key=len, reverse=True))
+            
+            # Apply the merge to every cached token list
+            for word, old_tokens in list(tokenized_cache.items()):
+                # Apply in-place merge of the chosen pair
+                new_tokens = apply_merge_to_tokens(old_tokens, most_frequent_pair, merged_tokens)
+
+                if new_tokens != old_tokens:
+                    # Re-tokenize from the original word with updated vocab
+                    tokenized_cache[word] = split_along_vocab(word, vocab_sorted_by_len)
+                else:
+                    tokenized_cache[word] = old_tokens
+
+            # Print training progress
+            print(f'{(len(base_vocabulary) / vocab_size) :.3%}% ({len(base_vocabulary)} / {vocab_size} learned vocab) - {datetime.now().strftime("%H:%M:%S")}')
 
         # Save the vocab and merges once its all done
         save_vocab(base_vocabulary)
         save_merges(merges)
 
 if __name__ == "__main__":
-
-    # example of using this method.
+    # Example of using this method.
     base = "abcdefghijklmnopqrstuvwxyz"
     base += "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     base += "0123456789"
@@ -125,4 +161,4 @@ if __name__ == "__main__":
     base += "\\"
     base += '"'
 
-    train_tokenizer("./data.txt", len(base)+500, [c for c in base])
+    train_tokenizer("./data.txt", len(base)+10000, [c for c in base])
